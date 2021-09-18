@@ -1,3 +1,4 @@
 venv
 src\ToGrowABackbone\__pycache__
 src\ToGrowABackbone.egg-info
+exercises\data
