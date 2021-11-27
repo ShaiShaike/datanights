@@ -20,9 +20,11 @@ class WeightedDataset(Dataset):
         self.classes_indexes = get_classes_indexes(dataset, num_classes=len(classes_weights))
         self.classes_lens = [len(indexes) for indexes in self.classes_indexes]
         self.probabilities = weights2np_probs(classes_weights)
+        self.amount = np.zeros(len(self.probabilities))
 
     def __getitem__(self, index):
         chosen_class = choose_index_by_prob(self.probabilities)
+        self.amount[chosen_class] = self.amount[chosen_class] + 1
         return self.dataset[self.classes_indexes[chosen_class][index % self.classes_lens[chosen_class]]]
 
 

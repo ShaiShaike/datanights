@@ -4,6 +4,8 @@ import torchvision.transforms as transforms
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from ToGrowABackbone.training_utils import WeightedDataset
+from ToGrowABackbone.training_utils import evaluate
 
 
 class Net(nn.Module):
@@ -35,6 +37,8 @@ def get_data():
 
     trainset = torchvision.datasets.CIFAR10(root='./data', train=True,
                                             download=True, transform=transform)
+    classes_weights=[1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    trainset = WeightedDataset(trainset, classes_weights)
     trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size,
                                             shuffle=True, num_workers=2)
 
@@ -46,14 +50,14 @@ def get_data():
     classes = ('plane', 'car', 'bird', 'cat',
             'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
     
-    return trainloader, testloader, classes
+    return trainloader, testloader, classes, classes_weights
 
 
-def train(net, trainloader, criterion, optimizer):
-    for epoch in range(2):  # loop over the dataset multiple times
+def train(net, trainloader, testloader, criterion, optimizer, classes, classes_weights):
+    for epoch in range(6):  # loop over the dataset multiple times
 
         running_loss = 0.0
-        for i, data in enumerate(trainloader, 0):
+        for i, data in enumerate(trainloader):
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels = data
 
@@ -65,53 +69,25 @@ def train(net, trainloader, criterion, optimizer):
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
-
-            # print statistics
-            running_loss += loss.item()
-            if i % 2000 == 1999:    # print every 2000 mini-batches
-                print('[%d, %5d] loss: %.3f' %
-                    (epoch + 1, i + 1, running_loss / 2000))
-                running_loss = 0.0
+        
+        print(f'Epoch {epoch}:')
+        print(f'probabilities: {trainloader.dataset.probabilities}')
+        evaluate(net, testloader, classes)
+        classes_weights[3] += 0.5
+        trainloader.dataset.change_weights(classes_weights)
 
     print('Finished Training')
 
 
-def evaluate(net, testloader, classes):
-    # prepare to count predictions for each class
-    correct_pred = {classname: 0 for classname in classes}
-    total_pred = {classname: 0 for classname in classes}
-
-    # again no gradients needed
-    with torch.no_grad():
-        for data in testloader:
-            images, labels = data
-            outputs = net(images)
-            _, predictions = torch.max(outputs, 1)
-            # collect the correct predictions for each class
-            for label, prediction in zip(labels, predictions):
-                if label == prediction:
-                    correct_pred[classes[label]] += 1
-                total_pred[classes[label]] += 1
-
-
-    # print accuracy for each class
-    for classname, correct_count in correct_pred.items():
-        accuracy = 100 * float(correct_count) / total_pred[classname]
-        print("Accuracy for class {:5s} is: {:.1f} %".format(classname,
-                                                    accuracy))
-
-
 def main():
-    trainloader, testloader, classes = get_data()
+    trainloader, testloader, classes, classes_weights = get_data()
 
     net = Net()
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
 
-    train(net, trainloader, criterion, optimizer)
+    train(net, trainloader, testloader, criterion, optimizer, classes, classes_weights)    
 
-    evaluate(net, testloader, classes)
-    
 
 if __name__ == '__main__':
     main()
