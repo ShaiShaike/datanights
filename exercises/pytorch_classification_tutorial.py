@@ -4,6 +4,7 @@ import torchvision.transforms as transforms
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from ToGrowABackbone.training_utils import evaluate
 
 
 class Net(nn.Module):
@@ -49,11 +50,11 @@ def get_data():
     return trainloader, testloader, classes
 
 
-def train(net, trainloader, criterion, optimizer):
-    for epoch in range(2):  # loop over the dataset multiple times
+def train(net, trainloader, testloader, criterion, optimizer, classes, classes_weights):
+    for epoch in range(6):  # loop over the dataset multiple times
 
         running_loss = 0.0
-        for i, data in enumerate(trainloader, 0):
+        for i, data in enumerate(trainloader):
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels = data
 
@@ -65,40 +66,11 @@ def train(net, trainloader, criterion, optimizer):
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
-
-            # print statistics
-            running_loss += loss.item()
-            if i % 2000 == 1999:    # print every 2000 mini-batches
-                print('[%d, %5d] loss: %.3f' %
-                    (epoch + 1, i + 1, running_loss / 2000))
-                running_loss = 0.0
+        
+        print(f'Epoch {epoch}:')
+        evaluate(net, testloader, classes)
 
     print('Finished Training')
-
-
-def evaluate(net, testloader, classes):
-    # prepare to count predictions for each class
-    correct_pred = {classname: 0 for classname in classes}
-    total_pred = {classname: 0 for classname in classes}
-
-    # again no gradients needed
-    with torch.no_grad():
-        for data in testloader:
-            images, labels = data
-            outputs = net(images)
-            _, predictions = torch.max(outputs, 1)
-            # collect the correct predictions for each class
-            for label, prediction in zip(labels, predictions):
-                if label == prediction:
-                    correct_pred[classes[label]] += 1
-                total_pred[classes[label]] += 1
-
-
-    # print accuracy for each class
-    for classname, correct_count in correct_pred.items():
-        accuracy = 100 * float(correct_count) / total_pred[classname]
-        print("Accuracy for class {:5s} is: {:.1f} %".format(classname,
-                                                    accuracy))
 
 
 def main():
@@ -109,8 +81,6 @@ def main():
     optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
 
     train(net, trainloader, criterion, optimizer)
-
-    evaluate(net, testloader, classes)
     
 
 if __name__ == '__main__':
